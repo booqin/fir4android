@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 # Create by BoQin on 2018/12/06
 import json
+import locale
 import os
 import zipfile
 
@@ -36,6 +37,7 @@ CHANGELOG = 'TEST'
 def get_apk(path):
     """
     获取路径名
+    指定路径下的第一个.apk文件
     :param path:
     :return:
     """
@@ -43,14 +45,22 @@ def get_apk(path):
     for parent, dirnames, filenames in os.walk(path):
         for filename in filenames:
             if os.path.splitext(filename)[1] == '.apk':
-                print(filename)
+                print(os.path.join(parent, filename))
                 return os.path.join(parent, filename)
 
 
 def init_apk_info(apk, env):
-    global NIKE_NAME, VERSION, BUILD, BUNDLE_ID
+    """
+    通过aapt读取apk包的信息，包括 包名，icon，版本号
+    通过git拉取最近三条的日志
+    :param apk:
+    :param env:
+    :return:
+    """
+    global NIKE_NAME, VERSION, BUILD, BUNDLE_ID, CHANGELOG
 
     cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-icon-320" % apk
+    # cmd = "/android/aapt dump badging %s | grep application-icon-320" % apk
     output = os.popen(cmd).read()
     icon_path = output[22:len(output) - 2]
     print(icon_path)
@@ -61,15 +71,17 @@ def init_apk_info(apk, env):
         saveIconFile.write(icon_data)
 
     cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-label-zh-CN" % apk
+    # cmd = "/android/aapt dump badging %s | grep application-label-zh-CN" % apk
 
     name_res = os.popen(cmd).read()
 
     NIKE_NAME = name_res[25:len(name_res) - 2]
 
     cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep package:" % apk
+    # cmd = "/android/aapt dump badging %s | grep package:" % apk
 
     info = os.popen(cmd).read()
-    infos = info[9:len(info) - 1].split(' ')
+    infos = info[9:len(info)-1].split(' ')
     print(infos)
     results = []
     for i in range(len(infos)):
@@ -78,11 +90,20 @@ def init_apk_info(apk, env):
     BUILD = get_str(results[1])
     BUNDLE_ID = get_str(results[0])
 
+    cmd = "git log -3 --pretty=format:'%s' --abbrev-commit"
+    CHANGELOG = os.popen(cmd).read()
+
 
 def get_str(str):
     return str[1:len(str)-1]
 
+
 def upload_fir(apk):
+    """
+    通过fir提供的接口上传图标和apk
+    :param apk:
+    :return:
+    """
     post_data = {'type': 'android', 'bundle_id': BUNDLE_ID,
                  'api_token': TOKEN}
     r = requests.post(URL, data=json.dumps(post_data), headers=HEADERS)
@@ -108,10 +129,9 @@ if __name__ == '__main__':
     """
     {PATH, ENV}
     """
+    # 配置全局编码格式
+    locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
+
     apk = get_apk(sys.argv[1])
     init_apk_info(apk, sys.argv[2])
     upload_fir(apk)
-    print(NIKE_NAME)
-    print(VERSION)
-    print(BUILD)
-    print(BUNDLE_ID)
