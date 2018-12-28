@@ -21,7 +21,7 @@ BUNDLE_ID = "com.qts.unknown"
 
 HEADERS = {"Content-Type": "application/json"}
 
-APK = './QtsCustomer-1.1.1-normal-release.apk'
+APK = './app-release.apk'
 
 NIKE_NAME = '青团社兼职'
 
