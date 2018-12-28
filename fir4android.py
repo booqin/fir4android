@@ -2,6 +2,7 @@
 # Create by BoQin on 2018/12/06
 import json
 import os
+import zipfile
 
 import requests
 import sys
@@ -10,20 +11,18 @@ PATH = ""
 
 URL = "http://api.fir.im/apps"
 
-TOKEN = "b3767abbc94ff93a935dec132fe93dd4"
+ICON_PATH = './build/temp/'
+ICON_NAME = ICON_PATH + 'icon.png'
 
-BUNDLE_ID = "com.qts.customer"
+TOKEN = "3855da5aeac872749eba641d23c3f8c1"
+
+BUNDLE_ID = "com.qts.unknown"
 
 HEADERS = {"Content-Type": "application/json"}
 
-ICON = './timg.jpeg'
-
 APK = './QtsCustomer-1.1.1-normal-release.apk'
 
-post_data = {'type': 'android', 'bundle_id': '5aa5de3f548b7a283bd87939',
-             'api_token': '3855da5aeac872749eba641d23c3f8c1'}
-
-NIKE_NAME = 'TEST'
+NIKE_NAME = '青团社兼职'
 
 VERSION = '11'
 
@@ -48,12 +47,50 @@ def get_apk(path):
                 return os.path.join(parent, filename)
 
 
+def init_apk_info(apk, env):
+    global NIKE_NAME, VERSION, BUILD, BUNDLE_ID
+
+    cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-icon-320" % apk
+    output = os.popen(cmd).read()
+    icon_path = output[22:len(output) - 2]
+    print(icon_path)
+    icon_data = zipfile.ZipFile(apk).read(icon_path)
+    if not os.path.exists(ICON_PATH):
+        os.makedirs(ICON_PATH)
+    with open(ICON_NAME, 'w+b') as saveIconFile:
+        saveIconFile.write(icon_data)
+
+    cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-label-zh-CN" % apk
+
+    name_res = os.popen(cmd).read()
+
+    NIKE_NAME = name_res[25:len(name_res) - 2]
+
+    cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep package:" % apk
+
+    info = os.popen(cmd).read()
+    infos = info[9:len(info) - 1].split(' ')
+    print(infos)
+    results = []
+    for i in range(len(infos)):
+        results.append(infos[i].split('=')[1])
+    VERSION = get_str(results[2]) + '-' + env
+    BUILD = get_str(results[1])
+    BUNDLE_ID = get_str(results[0])
+
+
+def get_str(str):
+    return str[1:len(str)-1]
+
 def upload_fir(apk):
+    post_data = {'type': 'android', 'bundle_id': BUNDLE_ID,
+                 'api_token': TOKEN}
     r = requests.post(URL, data=json.dumps(post_data), headers=HEADERS)
     if r.status_code == 201:
         res = json.loads(r.text)
         print(json.loads(r.text)['cert']['icon'])
-        upload_file(res['cert']['icon']['upload_url'], res['cert']['icon']['key'], res['cert']['icon']['token'], ICON)
+        upload_file(res['cert']['icon']['upload_url'], res['cert']['icon']['key'], res['cert']['icon']['token'],
+                    ICON_NAME)
         upload_file(res['cert']['binary']['upload_url'], res['cert']['binary']['key'], res['cert']['binary']['token'],
                     apk)
 
@@ -61,7 +98,6 @@ def upload_fir(apk):
 def upload_file(url, key, token, file):
     param_data = {'key': key, 'token': token, 'x:name': NIKE_NAME, 'x:version': VERSION, 'x:build': BUILD,
                   'x:changelog': CHANGELOG}
-    print(param_data)
     files = {'file': open(file, 'rb')}
     r = requests.post(url, data=param_data, files=files)
     print(r.status_code)
@@ -69,7 +105,13 @@ def upload_file(url, key, token, file):
 
 
 if __name__ == '__main__':
-    # NIKE_NAME = sys.argv[1]
-    # VERSION = sys.argv[2]
-    # BUILD = sys.argv[3]
-    upload_fir(get_apk('./'))
+    """
+    {PATH, ENV}
+    """
+    apk = get_apk(sys.argv[1])
+    init_apk_info(apk, sys.argv[2])
+    upload_fir(apk)
+    print(NIKE_NAME)
+    print(VERSION)
+    print(BUILD)
+    print(BUNDLE_ID)
