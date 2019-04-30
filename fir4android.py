@@ -161,7 +161,7 @@ if __name__ == '__main__':
     生产包路径，环境，备份源，备份目标路径
     {PATH, ENV, BAK_SOURCE_PATH, BAK_TARGET_PATH}
     """
-    zip_file_path(sys.argv[3] + "bakApk", sys.argv[4])
+    zip_file_path(sys.argv[3]+'/bakApk', sys.argv[4])
     locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
     apk = get_apk(sys.argv[1])
     init_apk_info(apk, sys.argv[2])
