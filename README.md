@@ -11,3 +11,5 @@
 
 调用控制台打印日志（含中文）编码异常：
 locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
+
+权限不足

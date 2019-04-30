@@ -8,6 +8,8 @@ import zipfile
 import requests
 import sys
 
+import time
+
 PATH = ""
 
 URL = "http://api.fir.im/apps"
@@ -37,7 +39,6 @@ CHANGELOG = 'TEST'
 def get_apk(path):
     """
     获取路径名
-    指定路径下的第一个.apk文件
     :param path:
     :return:
     """
@@ -45,22 +46,15 @@ def get_apk(path):
     for parent, dirnames, filenames in os.walk(path):
         for filename in filenames:
             if os.path.splitext(filename)[1] == '.apk':
-                print(os.path.join(parent, filename))
+                print(filename)
                 return os.path.join(parent, filename)
 
 
 def init_apk_info(apk, env):
-    """
-    通过aapt读取apk包的信息，包括 包名，icon，版本号
-    通过git拉取最近三条的日志
-    :param apk:
-    :param env:
-    :return:
-    """
     global NIKE_NAME, VERSION, BUILD, BUNDLE_ID, CHANGELOG
 
-    cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-icon-320" % apk
-    # cmd = "/android/aapt dump badging %s | grep application-icon-320" % apk
+    # cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-icon-320" % apk
+    cmd = "/android/aapt dump badging %s | grep application-icon-320" % apk
     output = os.popen(cmd).read()
     icon_path = output[22:len(output) - 2]
     print(icon_path)
@@ -70,15 +64,15 @@ def init_apk_info(apk, env):
     with open(ICON_NAME, 'w+b') as saveIconFile:
         saveIconFile.write(icon_data)
 
-    cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-label-zh-CN" % apk
-    # cmd = "/android/aapt dump badging %s | grep application-label-zh-CN" % apk
+    # cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep application-label-zh-CN" % apk
+    cmd = "/android/aapt dump badging %s | grep application-label-zh-CN" % apk
 
     name_res = os.popen(cmd).read()
 
     NIKE_NAME = name_res[25:len(name_res) - 2]
 
-    cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep package:" % apk
-    # cmd = "/android/aapt dump badging %s | grep package:" % apk
+    # cmd = "/Users/vito/Library/Android/sdk/build-tools/28.0.3/aapt dump badging %s | grep package:" % apk
+    cmd = "/android/aapt dump badging %s | grep package:" % apk
 
     info = os.popen(cmd).read()
     infos = info[9:len(info)-1].split(' ')
@@ -97,13 +91,7 @@ def init_apk_info(apk, env):
 def get_str(str):
     return str[1:len(str)-1]
 
-
 def upload_fir(apk):
-    """
-    通过fir提供的接口上传图标和apk
-    :param apk:
-    :return:
-    """
     post_data = {'type': 'android', 'bundle_id': BUNDLE_ID,
                  'api_token': TOKEN}
     r = requests.post(URL, data=json.dumps(post_data), headers=HEADERS)
@@ -125,13 +113,56 @@ def upload_file(url, key, token, file):
     print(r.text)
 
 
+def make_empty_dir(_dir):
+    if not os.path.exists(_dir):
+        os.makedirs(_dir)
+
+
+def get_zip_file(input_path, result):
+    """
+    对目录进行深度优先遍历
+    :param input_path:
+    :param result:
+    :return:
+    """
+    files = os.listdir(input_path)
+    for file in files:
+        if os.path.isdir(input_path + '/' + file):
+            get_zip_file(input_path + '/' + file, result)
+        else:
+            result.append(input_path + '/' + file)
+
+
+def zip_file_path(input_path, output_path):
+    """
+    压缩文件
+    :param input_path: 压缩的文件夹路径
+    :param output_path: 解压（输出）的路径
+    :param output_name: 压缩包名称
+    :return:
+    """
+    timeId = str(int(time.time()))
+    out_p = output_path + '/' + timeId
+    print("============================================")
+    print(out_p)
+    print('baseId:'+timeId)
+    print("============================================")
+    make_empty_dir(out_p)
+    f = zipfile.ZipFile(out_p + '/' + 'bakApk.zip', 'w', zipfile.ZIP_DEFLATED)
+    filelists = []
+    get_zip_file(input_path, filelists)
+    for file in filelists:
+        f.write(file, "bakApk/"+(""+file[len(input_path):]).split("/")[-2]+"/"+(""+file[len(input_path):]).split("/")[-1])
+    # 调用了close方法才会保证完成压缩
+    f.close()
+
 if __name__ == '__main__':
     """
-    {PATH, ENV}
+    生产包路径，环境，备份源，备份目标路径
+    {PATH, ENV, BAK_SOURCE_PATH, BAK_TARGET_PATH}
     """
-    # 配置全局编码格式
+    zip_file_path(sys.argv[3] + "bakApk", sys.argv[4])
     locale.setlocale(locale.LC_ALL, 'zh_CN.UTF-8')
-
     apk = get_apk(sys.argv[1])
     init_apk_info(apk, sys.argv[2])
     upload_fir(apk)
